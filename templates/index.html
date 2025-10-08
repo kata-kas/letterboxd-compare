@@ -3,97 +3,103 @@
 {% block title %}Home{% endblock %}
 
 {% block head %}
-  <style>
-  </style>
-  <script>
+<style>
+</style>
+<script>
     function redirect() {
-      let user1_elem = document.getElementById('user1');
-      let user2_elem = document.getElementById('user2');
-      let user1_error_elem = document.getElementById('user1-error');
-      let user2_error_elem = document.getElementById('user2-error');
-      let compare_button = document.getElementById('compare-button');
-       let user1_val = user1_elem.value.trim();
-       let user2_val = user2_elem.value.trim();
-      let error = false;
-      let err_message = "Username is not valid. Enter the LB username, not the display name.";
+        let user1_elem = document.getElementById('user1');
+        let user2_elem = document.getElementById('user2');
+        let user1_error_elem = document.getElementById('user1-error');
+        let user2_error_elem = document.getElementById('user2-error');
+        let compare_button = document.getElementById('compare-button');
+        let user1_val = user1_elem.value.trim();
+        let user2_val = user2_elem.value.trim();
+        let error = false;
+        let err_message = "Username is not valid. Enter the LB username, not the display name.";
 
-      clear_form_error(user1_error_elem);
-      clear_form_error(user2_error_elem);
-      if (!validate_username(user1_val)) {
-        set_form_error(user1_error_elem, err_message);
-        error = true;
-      }
-      if (!validate_username(user2_val)) {
-        set_form_error(user2_error_elem, err_message);
-        error = true;
-      }
-      if (error) {
-        return;
-      }
-       // redirect to the compare location
-       compare_button.classList.add("is-loading");
-       window.location = "/" + user1_elem.value.trim() + "/vs/" + user2_elem.value.trim();
+        clear_form_error(user1_error_elem);
+        clear_form_error(user2_error_elem);
+        if (!validate_username(user1_val)) {
+            set_form_error(user1_error_elem, err_message);
+            error = true;
+        }
+        if (!validate_username(user2_val)) {
+            set_form_error(user2_error_elem, err_message);
+            error = true;
+        }
+        if (error) {
+            return;
+        }
+        // redirect to the compare location
+        compare_button.classList.add("is-loading");
+        window.location = "/" + user1_elem.value.trim() + "/vs/" + user2_elem.value.trim();
     }
+
     function validate_username(username) {
-      let username_regex = /^[a-zA-Z0-9_]+$/;
-      if (username.length == 0 || !username.match(username_regex)) {
-        return false;
-      }
-      return true;
+        let username_regex = /^[a-zA-Z0-9_]+$/;
+        if (username.length === 0 || !username.match(username_regex)) {
+            return false;
+        }
+        return true;
     }
+
     function set_form_error(elem, message) {
-      elem.innerHTML = message;
-      elem.style = "display: block";
+        elem.innerHTML = message;
+        elem.style = "display: block";
     }
+
     function clear_form_error(elem) {
-      elem.innerHTML = "";
-      elem.style = "display: none";
+        elem.innerHTML = "";
+        elem.style = "display: none";
     }
-    window.onload = function() {
-      let form = document.getElementById("input-form");
-      form.onsubmit = function(event) {
-        event.preventDefault();
-        return false;
-      }
+
+    window.onload = function () {
+        let form = document.getElementById("input-form");
+        form.onsubmit = function (event) {
+            event.preventDefault();
+            return false;
+        }
     }
-  </script>
+</script>
 {% endblock %}
 
 {% block content %}
-  <div style="margin-bottom: 2em">
+<div style="margin-bottom: 2em">
     <h1 class="title is-2" style="margin-bottom: 0px">
-      Letterboxd Compare
+        Letterboxd Compare
     </h1>
     <a href="https://github.com/kata-kas/letterboxd-compare" target="_blank">kata-kas/letterboxd-compare</a>
-  </div>
-  <form id="input-form" onsubmit="redirect()">
-  <h1 class="title is-4">
-    Movies that
-    <p>
-      <input id="user1" class="input is-1" placeholder="LB username"></input>
-      <p id="user1-error" class="help is-danger" style="display: none"></p>
+</div>
+<form id="input-form" onsubmit="redirect()">
+    <div class="field">
+        <label class="label">Movies that</label>
+        <div class="control">
+            <input id="user1" class="input is-1" placeholder="LB username">
+            <p id="user1-error" class="help is-danger" style="display: none"></p>
+        </div>
+    </div>
+    <div class="field">
+        <label class="label">has watched, but</label>
+        <div class="control">
+            <input id="user2" class="input is-1" placeholder="LB username">
+            <p id="user2-error" class="help is-danger" style="display: none"></p>
+        </div>
+    </div>
+    <label class="label">hasn't!</label>
+    <p class="subtitle">
+        <button type="submit" id="compare-button" class="button is-link" onclick="redirect()">Compare</button>
     </p>
-    has watched, but
-    <p>
-      <input id="user2" class="input is-1" placeholder="LB username"></input>
-      <p id="user2-error" class="help is-danger" style="display: none"></p>
-    </p>
-    hasn't!
-  </h1>
-  <p class="subtitle">
-  <button type="submit" id="compare-button" class="button is-link" onclick="redirect()">Compare</button>
-  </p>
-  </form>
+</form>
 
-  {# error #}
-  {% if error_mess.is_some() %}
-  <article class="message is-danger">
+{# error #}
+{% if error_mess.is_some() %}
+<article class="message is-danger">
     <div class="message-header">
-      <p>Error</p>
+        <p>Error</p>
     </div>
     <div class="message-body">
-      {{ error_mess.unwrap() }}
+        {{ error_mess.unwrap() }}
     </div>
-  </article>
-  {% endif %}
+</article>
+{% endif %}
 {% endblock %}

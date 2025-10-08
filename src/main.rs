@@ -24,11 +24,18 @@ struct IndexTemplate<'a> {
 }
 
 #[derive(Template)]
+#[template(path = "components/card.html")]
+struct CardTemplate<'a> {
+    movie: &'a Film,
+    ratings: Vec<(&'a str, Option<Rating>)>,
+}
+
+#[derive(Template)]
 #[template(path = "diff.html")]
 struct DiffTemplate<'a> {
     user1: &'a str,
     user2: &'a str,
-    diff: Vec<Film>,
+    cards: Vec<CardTemplate<'a>>,
 }
 
 #[derive(Template)]
@@ -36,7 +43,7 @@ struct DiffTemplate<'a> {
 struct AndTemplate<'a> {
     user1: &'a str,
     user2: &'a str,
-    diff: Vec<(Film, Option<Rating>)>,
+    cards: Vec<CardTemplate<'a>>,
 }
 
 lazy_static! {
@@ -132,10 +139,14 @@ async fn get_diff(cache: &RedisCache, user1: &str, user2: &str) -> Result<String
         .collect();
     diff.sort_by(|a, b| a.rating.partial_cmp(&b.rating).unwrap().reverse());
 
+    let cards: Vec<CardTemplate> = diff.iter().map(|movie| CardTemplate {
+        movie,
+        ratings: vec![(&user1, movie.rating)],
+    }).collect();
     let html = DiffTemplate {
         user1: &user1,
         user2: &user2,
-        diff,
+        cards,
     }.render().map_err(|e| anyhow::anyhow!("Diff template error: {}", e))?;
     Ok(html.into())
 }
@@ -157,10 +168,14 @@ async fn get_and(cache: &RedisCache, user1: &str, user2: &str) -> Result<String>
         other => other,
     });
 
+    let cards: Vec<CardTemplate> = diff.iter().map(|(movie, other_rating)| CardTemplate {
+        movie,
+        ratings: vec![(&user1, movie.rating), (&user2, *other_rating)],
+    }).collect();
     let html = AndTemplate {
         user1: &user1,
         user2: &user2,
-        diff,
+        cards,
     }.render().map_err(|e| anyhow::anyhow!("And template error: {}", e))?;
     Ok(html.into())
 }

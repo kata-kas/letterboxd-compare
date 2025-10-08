@@ -1,0 +1,40 @@
+<div class="column is-one-quarter-desktop is-half-tablet is-full-mobile">
+  <div class="card is-flex is-flex-direction-column">
+    <header class="card-header">
+      <p class="card-header-title is-6" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><a href="{{ movie.url }}">{{ movie.name }}</a></p>
+    </header>
+    <div class="card-image">
+      <figure class="image is-2by3">
+        <img src="{{ movie.poster }}" alt="{{ movie.name }}">
+      </figure>
+    </div>
+    <div class="card-content">
+      <div class="content">
+        {% for (uname, rat) in ratings %}
+        <p class="subtitle is-7">{{ uname }}: {% if rat.is_some() %}{{ rat.unwrap() }}{% else %}No rating{% endif %}</p>
+        {% endfor %}
+      </div>
+    </div>
+    <footer class="card-footer">
+      <div class="card-footer-item">
+        <button class="button is-ghost is-small" onclick="navigator.clipboard.writeText('{{ movie.url }}'); showNotification();">Copy Link</button>
+      </div>
+    </footer>
+  </div>
+</div>
+<script>
+  if (typeof showNotification === 'undefined') {
+    window.showNotification = function() {
+      const notification = document.createElement('div');
+      notification.className = 'notification is-success';
+      notification.style.position = 'fixed';
+      notification.style.top = '10px';
+      notification.style.right = '10px';
+      notification.style.zIndex = '1000';
+      notification.innerHTML = '<button class="delete"></button><strong>Copied!</strong> Film URL copied to clipboard.';
+      document.body.appendChild(notification);
+      notification.querySelector('.delete').addEventListener('click', () => notification.remove());
+      setTimeout(() => { if (notification.parentNode) notification.remove(); }, 3000);
+    };
+  }
+</script>

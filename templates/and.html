@@ -3,15 +3,16 @@
 {% block title %}{{ user1 }} vs {{ user2 }}{% endblock %}
 
 {% block head %}
-  <style>
-  </style>
-  <script>
-    function redirect() {
-           let user1 = document.getElementById('user1').value.trim();
-           let user2 = document.getElementById('user2').value.trim();
-           window.location = "/" + user1 + "/vs/" + user2;
-         }
-  </script>
+<script>
+  function showNotification() {
+    const notification = document.createElement('div');
+    notification.className = 'notification is-success';
+    notification.innerHTML = '<button class="delete"></button><strong>Copied!</strong> Film URL copied to clipboard.';
+    document.body.appendChild(notification);
+    notification.querySelector('.delete').addEventListener('click', () => notification.remove());
+    setTimeout(() => { if (notification.parentNode) notification.remove(); }, 3000);
+  }
+</script>
 {% endblock %}
 
 {% block content %}
@@ -26,25 +27,8 @@
   <a class="button is-link" href="/{{ user2 }}/vs/{{ user1 }}">Versus comparison</a>
   </p>
    <div class="columns is-multiline">
-     {% for (movie, other_rating) in diff %}
-     <div class="column is-one-quarter-desktop is-half-tablet is-full-mobile">
-       <div class="card is-flex is-flex-direction-column">
-         <div class="card-image">
-           <figure class="image is-2by3">
-             <img src="{{ movie.poster }}" alt="{{ movie.name }}">
-           </figure>
-         </div>
-         <div class="card-content is-flex-grow-1" style="min-height: 120px;">
-           <div class="content">
-             <p class="title is-6"><a href="{{ movie.url }}">{{ movie.name }}</a></p>
-             <p class="subtitle is-7">
-               {% if movie.rating.is_some() %} {{ user1 }}: {{ movie.rating.unwrap() }} {% endif %}
-               {% if other_rating.is_some() %} | {{ user2 }}: {{ other_rating.unwrap() }} {% endif %}
-             </p>
-           </div>
-         </div>
-       </div>
-     </div>
+     {% for card in cards %}
+     {{ card|safe }}
      {% endfor %}
    </div>
 {% endblock %}
