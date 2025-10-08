@@ -13,7 +13,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::try_join;
 use tracing::{debug, info};
-use tracing_subscriber;
 use warp::http::Response;
 use warp::Filter;
 
@@ -47,13 +46,13 @@ struct AndTemplate<'a> {
 }
 
 lazy_static! {
-    static ref CLIENT: LetterboxdClient = LetterboxdClient::new();
+    static ref CLIENT: LetterboxdClient = LetterboxdClient::new().unwrap();
 }
 
 async fn handle_vs(cache: Arc<RedisCache>, user1: String, user2: String) -> Result<warp::reply::Html<String>, warp::reject::Rejection> {
     let user1 = user1.trim().to_string();
     let user2 = user2.trim().to_string();
-    match get_diff(&*cache, &user1, &user2).await {
+    match get_diff(&cache, &user1, &user2).await {
         Ok(s) => Ok(warp::reply::html(s)),
         Err(err) => {
             debug!("{:?}", &err);
@@ -73,7 +72,7 @@ async fn handle_vs(cache: Arc<RedisCache>, user1: String, user2: String) -> Resu
 async fn handle_and(cache: Arc<RedisCache>, user1: String, user2: String) -> Result<warp::reply::Html<String>, warp::reject::Rejection> {
     let user1 = user1.trim().to_string();
     let user2 = user2.trim().to_string();
-    match get_and(&*cache, &user1, &user2).await {
+    match get_and(&cache, &user1, &user2).await {
         Ok(s) => Ok(warp::reply::html(s)),
         Err(err) => {
             debug!("{:?}", &err);
@@ -141,14 +140,14 @@ async fn get_diff(cache: &RedisCache, user1: &str, user2: &str) -> Result<String
 
     let cards: Vec<CardTemplate> = diff.iter().map(|movie| CardTemplate {
         movie,
-        ratings: vec![(&user1, movie.rating)],
+        ratings: vec![(user1, movie.rating)],
     }).collect();
     let html = DiffTemplate {
-        user1: &user1,
-        user2: &user2,
+        user1,
+        user2,
         cards,
     }.render().map_err(|e| anyhow::anyhow!("Diff template error: {}", e))?;
-    Ok(html.into())
+    Ok(html)
 }
 
 async fn get_and(cache: &RedisCache, user1: &str, user2: &str) -> Result<String> {
@@ -170,14 +169,14 @@ async fn get_and(cache: &RedisCache, user1: &str, user2: &str) -> Result<String>
 
     let cards: Vec<CardTemplate> = diff.iter().map(|(movie, other_rating)| CardTemplate {
         movie,
-        ratings: vec![(&user1, movie.rating), (&user2, *other_rating)],
+        ratings: vec![(user1, movie.rating), (user2, *other_rating)],
     }).collect();
     let html = AndTemplate {
-        user1: &user1,
-        user2: &user2,
+        user1,
+        user2,
         cards,
     }.render().map_err(|e| anyhow::anyhow!("And template error: {}", e))?;
-    Ok(html.into())
+    Ok(html)
 }
 
 #[tokio::main]
@@ -187,7 +186,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port = std::env::var("PORT")
         .ok()
         .and_then(|port| port.parse().ok())
-        .unwrap_or_else(|| 3030);
+        .unwrap_or(3030);
 
     let versus = {
         let cache_clone = cache.clone();
