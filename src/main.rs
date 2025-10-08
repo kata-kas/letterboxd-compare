@@ -29,6 +29,10 @@ struct CardTemplate<'a> {
     ratings: Vec<(&'a str, Option<Rating>)>,
 }
 
+
+
+
+
 #[derive(Template)]
 #[template(path = "diff.html")]
 struct DiffTemplate<'a> {
@@ -190,7 +194,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let versus = {
         let cache_clone = cache.clone();
-        warp::path!(String / "vs" / String).and_then(move |user1, user2| handle_vs(cache_clone.clone(), user1, user2))
+        warp::path!(String / "vs" / String)
+            .and_then(move |user1, user2| handle_vs(cache_clone.clone(), user1, user2))
     };
     let same = {
         let cache_clone = cache.clone();

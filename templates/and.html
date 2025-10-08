@@ -2,33 +2,23 @@
 
 {% block title %}{{ user1 }} vs {{ user2 }}{% endblock %}
 
-{% block head %}
-<script>
-  function showNotification() {
-    const notification = document.createElement('div');
-    notification.className = 'notification is-success';
-    notification.innerHTML = '<button class="delete"></button><strong>Copied!</strong> Film URL copied to clipboard.';
-    document.body.appendChild(notification);
-    notification.querySelector('.delete').addEventListener('click', () => notification.remove());
-    setTimeout(() => { if (notification.parentNode) notification.remove(); }, 3000);
-  }
-</script>
-{% endblock %}
-
 {% block content %}
-  <a class="button is-medium is-ghost" href="/">
+<a class="button is-medium is-ghost pl-0" href="/">
     Letterboxd Compare
-  </a>
-  <h1 class="title is-4">
-    Movies that both <span class="title is-1">{{ user1 }}</span> and <span class="title is-1">{{ user2 }}</span> has watched sorted by former's rating.
-  </h1>
-  <p class="subtitle">
-  <a class="button is-link" href="/{{ user2 }}/and/{{ user1 }}">Invert Comparison</a>
-  <a class="button is-link" href="/{{ user2 }}/vs/{{ user1 }}">Versus comparison</a>
-  </p>
-   <div class="columns is-multiline">
-     {% for card in cards %}
-     {{ card|safe }}
-     {% endfor %}
-   </div>
+</a>
+<div class="content">
+    <h1 class="title is-4">
+        Movies that both <span class="title is-1">{{ user1 }}</span> and <span class="title is-1">{{ user2 }}</span> has
+        watched sorted by former's rating.
+    </h1>
+</div>
+<div class="block is-flex is-gap-2">
+    <a class="button is-link" href="/{{ user2 }}/vs/{{ user1 }}">Invert Comparison</a>
+    <a class="button is-link" href="/{{ user2 }}/and/{{ user1 }}">And comparison</a>
+</div>
+<div class="columns is-multiline">
+    {% for card in cards %}
+    {{ card|safe }}
+    {% endfor %}
+</div>
 {% endblock %}
