@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 #[macro_use]
 extern crate lazy_static;
 
@@ -11,6 +10,7 @@ use anyhow::Result;
 use askama::Template;
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::sync::Arc;
 use tokio::try_join;
 use tracing::{debug, info};
 use tracing_subscriber;
@@ -40,23 +40,69 @@ struct AndTemplate<'a> {
 
 lazy_static! {
     static ref CLIENT: LetterboxdClient = LetterboxdClient::new();
-    static ref CACHE: FileCache = FileCache::new().unwrap();
 }
 
-async fn cached_get_movies(username: &str) -> Result<Vec<Film>> {
-    if let Some(s) = CACHE.get(username)? {
+async fn handle_vs(cache: Arc<RedisCache>, user1: String, user2: String) -> Result<warp::reply::Html<String>, warp::reject::Rejection> {
+    match get_diff(&*cache, &user1, &user2).await {
+        Ok(s) => Ok(warp::reply::html(s)),
+        Err(err) => {
+            debug!("{:?}", &err);
+            match (IndexTemplate {
+                error_mess: Some(&err.to_string()),
+            }).render() {
+                Ok(html) => Ok(warp::reply::html(html)),
+                Err(e) => {
+                    tracing::error!("Template render error: {}", e);
+                    Ok(warp::reply::html("Internal server error".to_string()))
+                }
+            }
+        }
+    }
+}
+
+async fn handle_and(cache: Arc<RedisCache>, user1: String, user2: String) -> Result<warp::reply::Html<String>, warp::reject::Rejection> {
+    match get_and(&*cache, &user1, &user2).await {
+        Ok(s) => Ok(warp::reply::html(s)),
+        Err(err) => {
+            debug!("{:?}", &err);
+            match (IndexTemplate {
+                error_mess: Some(&err.to_string()),
+            }).render() {
+                Ok(html) => Ok(warp::reply::html(html)),
+                Err(e) => {
+                    tracing::error!("Template render error: {}", e);
+                    Ok(warp::reply::html("Internal server error".to_string()))
+                }
+            }
+        }
+    }
+}
+
+async fn handle_health(cache: Arc<RedisCache>) -> Result<warp::reply::Json, warp::reject::Rejection> {
+    // Check cache health by trying to get a non-existent key
+    match cache.get("__health_check__").await {
+        Ok(_) => Ok(warp::reply::json(&serde_json::json!({"status": "healthy"}))),
+        Err(e) => {
+            tracing::error!("Cache health check failed: {}", e);
+            Ok(warp::reply::json(&serde_json::json!({"status": "unhealthy", "error": e.to_string()})))
+        }
+    }
+}
+
+async fn cached_get_movies(cache: &RedisCache, username: &str) -> Result<Vec<Film>> {
+    if let Some(s) = cache.get(username).await? {
         info!("cache hit for {}", username);
         let ret: Vec<Film> = serde_json::from_str(&s)?;
         return Ok(ret);
     }
     let movies = CLIENT.get_movies_of_user(username).await?;
-    CACHE.insert(username, &serde_json::to_string(&movies)?)?;
+    cache.insert(username, &serde_json::to_string(&movies)?).await?;
     Ok(movies)
 }
 
-async fn get_diff(user1: &str, user2: &str) -> Result<String> {
+async fn get_diff(cache: &RedisCache, user1: &str, user2: &str) -> Result<String> {
     info!("get_diff({}, {})", user1, user2);
-    let (movies1, movies2) = try_join!(cached_get_movies(user1), cached_get_movies(user2))?;
+    let (movies1, movies2) = try_join!(cached_get_movies(cache, user1), cached_get_movies(cache, user2))?;
 
     let watched_by_2: HashSet<_> = movies2.into_iter().map(|x| x.id).collect();
 
@@ -66,19 +112,17 @@ async fn get_diff(user1: &str, user2: &str) -> Result<String> {
         .collect();
     diff.sort_by(|a, b| a.rating.partial_cmp(&b.rating).unwrap().reverse());
 
-    Ok(DiffTemplate {
+    let html = DiffTemplate {
         user1: &user1,
         user2: &user2,
         diff,
-    }
-    .render()
-    .unwrap()
-    .into())
+    }.render().map_err(|e| anyhow::anyhow!("Diff template error: {}", e))?;
+    Ok(html.into())
 }
 
-async fn get_and(user1: &str, user2: &str) -> Result<String> {
+async fn get_and(cache: &RedisCache, user1: &str, user2: &str) -> Result<String> {
     info!("get_and({}, {})", user1, user2);
-    let (movies1, movies2) = try_join!(cached_get_movies(user1), cached_get_movies(user2))?;
+    let (movies1, movies2) = try_join!(cached_get_movies(cache, user1), cached_get_movies(cache, user2))?;
 
     let watched_by_2: HashSet<_> = movies2.into_iter().collect();
 
@@ -93,69 +137,44 @@ async fn get_and(user1: &str, user2: &str) -> Result<String> {
         other => other,
     });
 
-    Ok(AndTemplate {
+    let html = AndTemplate {
         user1: &user1,
         user2: &user2,
         diff,
-    }
-    .render()
-    .unwrap()
-    .into())
+    }.render().map_err(|e| anyhow::anyhow!("And template error: {}", e))?;
+    Ok(html.into())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
+    let cache = Arc::new(RedisCache::new().await?);
     let port = std::env::var("PORT")
         .ok()
         .and_then(|port| port.parse().ok())
         .unwrap_or_else(|| 3030);
 
-    let versus = warp::path!(String / "vs" / String).and_then(
-        async move |user1: String,
-                    user2: String|
-                    -> Result<warp::reply::Html<String>, warp::reject::Rejection> {
-            match get_diff(&user1, &user2).await {
-                Ok(s) => Ok(warp::reply::html(s)),
-                Err(err) => {
-                    debug!("{:?}", &err);
-                    Ok(warp::reply::html(
-                        IndexTemplate {
-                            error_mess: Some(&err.to_string()),
-                        }
-                        .render()
-                        .unwrap()
-                        .into(),
-                    ))
-                }
-            }
-        },
-    );
-    let same = warp::path!(String / "and" / String).and_then(
-        async move |user1: String,
-                    user2: String|
-                    -> Result<warp::reply::Html<String>, warp::reject::Rejection> {
-            match get_and(&user1, &user2).await {
-                Ok(s) => Ok(warp::reply::html(s)),
-                Err(err) => {
-                    debug!("{:?}", &err);
-                    Ok(warp::reply::html(
-                        IndexTemplate {
-                            error_mess: Some(&err.to_string()),
-                        }
-                        .render()
-                        .unwrap()
-                        .into(),
-                    ))
-                }
-            }
-        },
-    );
+    let versus = {
+        let cache_clone = cache.clone();
+        warp::path!(String / "vs" / String).and_then(move |user1, user2| handle_vs(cache_clone.clone(), user1, user2))
+    };
+    let same = {
+        let cache_clone = cache.clone();
+        warp::path!(String / "and" / String).and_then(move |user1, user2| handle_and(cache_clone.clone(), user1, user2))
+    };
+    let health = {
+        let cache_clone = cache.clone();
+        warp::path("health").and(warp::get()).and_then(move || handle_health(cache_clone.clone()))
+    };
     let index = warp::path::end().map(|| -> warp::reply::Html<String> {
-        return warp::reply::html(IndexTemplate { error_mess: None }.render().unwrap().into());
+        let html = IndexTemplate { error_mess: None }.render().unwrap_or_else(|e| {
+            tracing::error!("Index template render error: {}", e);
+            "Internal server error".to_string()
+        });
+        warp::reply::html(html)
     });
 
-    let routes = versus.or(same).or(index);
+    let routes = health.or(versus).or(same).or(index);
 
     warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 

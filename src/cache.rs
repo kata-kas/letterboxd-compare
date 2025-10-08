@@ -1,57 +1,47 @@
-use std::fs::{self, create_dir, File};
-use std::io::prelude::*;
-use std::io::ErrorKind;
-use std::path::PathBuf;
+ use anyhow::Result;
+ use deadpool_redis::{redis::AsyncCommands, Config, Connection, Pool, Runtime};
+ use std::env;
 
-/// Simple file backed cache
-pub struct FileCache {}
+ /// Redis backed cache using Upstash with connection pooling
+ pub struct RedisCache {
+     pool: Pool,
+     ttl_seconds: u64,
+     key_prefix: String,
+ }
 
-impl FileCache {
-    const CACHE_DIR: &'static str = "./cache";
+ impl RedisCache {
+     const DEFAULT_TTL_SECONDS: u64 = 3600; // 1 hour
+     const KEY_PREFIX: &'static str = "letterboxd_cache:";
 
-    pub fn new() -> Result<Self, std::io::Error> {
-        match create_dir(Self::CACHE_DIR) {
-            Ok(()) => {}
-            Err(e) if e.kind() == ErrorKind::AlreadyExists => {}
-            Err(e) => return Err(e),
-        }
-        Ok(FileCache {})
-    }
+     pub async fn new() -> Result<Self> {
+         let url = env::var("UPSTASH_REDIS_URL")
+             .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+         let ttl = env::var("CACHE_TTL_SECONDS")
+             .ok()
+             .and_then(|s| s.parse().ok())
+             .unwrap_or(Self::DEFAULT_TTL_SECONDS);
+         let cfg = Config::from_url(url);
+         let pool = cfg.create_pool(Some(Runtime::Tokio1))?;
+         Ok(RedisCache {
+             pool,
+             ttl_seconds: ttl,
+             key_prefix: Self::KEY_PREFIX.to_string(),
+         })
+     }
 
-    fn get_cache_file(key: &str) -> PathBuf {
-        PathBuf::from(&format!("{}/{}", Self::CACHE_DIR, key))
-    }
+     fn prefixed_key(&self, key: &str) -> String {
+         format!("{}{}", self.key_prefix, key)
+     }
 
-    pub fn get(&self, key: &str) -> Result<Option<String>, std::io::Error> {
-        let mut file = match File::open(Self::get_cache_file(key)) {
-            Ok(f) => f,
-            Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
-            Err(err) => return Err(err),
-        };
+     pub async fn get(&self, key: &str) -> Result<Option<String>> {
+         let mut conn: Connection = self.pool.get().await?;
+         let result: Option<String> = conn.get(self.prefixed_key(key)).await?;
+         Ok(result)
+     }
 
-        // TODO: remove if file too old? if so possible race
-        // can use an rwlock in that case
-
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        Ok(Some(contents))
-    }
-
-    // TODO: make insert mutably borrow
-    pub fn insert(&self, key: &str, value: &str) -> Result<(), std::io::Error> {
-        // create_new is atomic, so possible race condition should be avoided
-        let mut file = match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(Self::get_cache_file(key))
-        {
-            Ok(f) => f,
-            // TODO: what if the file already exists
-            // remove it and overwrite?
-            Err(e) if e.kind() == ErrorKind::AlreadyExists => return Ok(()),
-            Err(e) => return Err(e),
-        };
-
-        file.write_all(value.as_bytes())
-    }
-}
+     pub async fn insert(&self, key: &str, value: &str) -> Result<()> {
+         let mut conn: Connection = self.pool.get().await?;
+         conn.set_ex::<_, _, ()>(self.prefixed_key(key), value, self.ttl_seconds).await?;
+         Ok(())
+     }
+ }

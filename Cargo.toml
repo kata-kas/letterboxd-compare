@@ -21,3 +21,5 @@ tracing = "0.1"
 tracing-subscriber = "0.2"
 tracing-futures = "0.2"
 thiserror = "1.0"
+redis = { version = "0.24", features = ["tokio-comp"] }
+deadpool-redis = "0.14"
