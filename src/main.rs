@@ -44,6 +44,8 @@ lazy_static! {
 }
 
 async fn handle_vs(cache: Arc<RedisCache>, user1: String, user2: String) -> Result<warp::reply::Html<String>, warp::reject::Rejection> {
+    let user1 = user1.trim().to_string();
+    let user2 = user2.trim().to_string();
     match get_diff(&*cache, &user1, &user2).await {
         Ok(s) => Ok(warp::reply::html(s)),
         Err(err) => {
@@ -62,6 +64,8 @@ async fn handle_vs(cache: Arc<RedisCache>, user1: String, user2: String) -> Resu
 }
 
 async fn handle_and(cache: Arc<RedisCache>, user1: String, user2: String) -> Result<warp::reply::Html<String>, warp::reject::Rejection> {
+    let user1 = user1.trim().to_string();
+    let user2 = user2.trim().to_string();
     match get_and(&*cache, &user1, &user2).await {
         Ok(s) => Ok(warp::reply::html(s)),
         Err(err) => {

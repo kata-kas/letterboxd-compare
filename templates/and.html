@@ -7,10 +7,10 @@
   </style>
   <script>
     function redirect() {
-          let user1 = document.getElementById('user1').value;
-          let user2 = document.getElementById('user2').value;
-          window.location = "/" + user1 + "/vs/" + user2;
-        }
+           let user1 = document.getElementById('user1').value.trim();
+           let user2 = document.getElementById('user2').value.trim();
+           window.location = "/" + user1 + "/vs/" + user2;
+         }
   </script>
 {% endblock %}
 

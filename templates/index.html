@@ -12,8 +12,8 @@
       let user1_error_elem = document.getElementById('user1-error');
       let user2_error_elem = document.getElementById('user2-error');
       let compare_button = document.getElementById('compare-button');
-      let user1_val = user1_elem.value;
-      let user2_val = user2_elem.value;
+       let user1_val = user1_elem.value.trim();
+       let user2_val = user2_elem.value.trim();
       let error = false;
       let err_message = "Username is not valid. Enter the LB username, not the display name.";
 
@@ -30,9 +30,9 @@
       if (error) {
         return;
       }
-      // redirect to the compare location
-      compare_button.classList.add("is-loading");
-      window.location = "/" + user1_elem.value + "/vs/" + user2_elem.value;
+       // redirect to the compare location
+       compare_button.classList.add("is-loading");
+       window.location = "/" + user1_elem.value.trim() + "/vs/" + user2_elem.value.trim();
     }
     function validate_username(username) {
       let username_regex = /^[a-zA-Z0-9_]+$/;
