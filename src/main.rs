@@ -14,6 +14,7 @@ use std::sync::Arc;
 use tokio::try_join;
 use tracing::{debug, info};
 use tracing_subscriber;
+use warp::http::Response;
 use warp::Filter;
 
 #[derive(Template)]
@@ -87,6 +88,21 @@ async fn handle_health(cache: Arc<RedisCache>) -> Result<warp::reply::Json, warp
             Ok(warp::reply::json(&serde_json::json!({"status": "unhealthy", "error": e.to_string()})))
         }
     }
+}
+
+async fn handle_poster(slug: String) -> Result<warp::http::Response<Vec<u8>>, warp::reject::Rejection> {
+    let api_url = format!("https://letterboxd.com/film/{}/poster/std/230/", slug);
+    let resp: reqwest::Response = CLIENT.client.get(&api_url).send().await.map_err(|_| warp::reject::not_found())?;
+    let json: serde_json::Value = resp.json().await.map_err(|_| warp::reject::not_found())?;
+    let image_url: &str = json["url2x"].as_str().ok_or(warp::reject::not_found())?;
+    let image_resp: reqwest::Response = CLIENT.client.get(image_url).send().await.map_err(|_| warp::reject::not_found())?;
+    let content_type: String = image_resp.headers().get("content-type").and_then(|h| h.to_str().ok()).unwrap_or("image/jpeg").to_string();
+    let bytes = image_resp.bytes().await.map_err(|_| warp::reject::not_found())?;
+    let response = Response::builder()
+        .header("content-type", content_type)
+        .body(bytes.to_vec())
+        .unwrap();
+    Ok(response)
 }
 
 async fn cached_get_movies(cache: &RedisCache, username: &str) -> Result<Vec<Film>> {
@@ -166,6 +182,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let cache_clone = cache.clone();
         warp::path("health").and(warp::get()).and_then(move || handle_health(cache_clone.clone()))
     };
+    let poster = warp::path!("poster" / String).and_then(handle_poster);
     let index = warp::path::end().map(|| -> warp::reply::Html<String> {
         let html = IndexTemplate { error_mess: None }.render().unwrap_or_else(|e| {
             tracing::error!("Index template render error: {}", e);
@@ -174,7 +191,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         warp::reply::html(html)
     });
 
-    let routes = health.or(versus).or(same).or(index);
+    let routes = health.or(versus).or(same).or(poster).or(index);
 
     warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 

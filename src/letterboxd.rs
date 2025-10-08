@@ -26,7 +26,7 @@ pub enum LetterboxdError {
 }
 
 pub struct LetterboxdClient {
-    client: reqwest::Client,
+    pub client: reqwest::Client,
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq)]
@@ -134,7 +134,7 @@ impl LetterboxdClient {
 
     fn film_from_elem_ref(&self, movie: &scraper::ElementRef) -> Result<Film> {
         let data_selector = Selector::parse("div[data-film-id]").unwrap();
-        let poster_selector = Selector::parse("img").unwrap();
+        let poster_selector = Selector::parse("div.poster.film-poster img").unwrap();
         let rating_selector = Selector::parse("span.rating").unwrap();
 
         let data = movie.select(&data_selector).next().unwrap().value();
@@ -145,6 +145,8 @@ impl LetterboxdClient {
             .next()
             .map(|r| Self::parse_rating(r.text().next().unwrap()))
             .transpose()?;
+        let slug = data.attr("data-item-slug")
+            .ok_or(LetterboxdError::HtmlMissingAttr("data-item-slug".into()))?;
         Ok(Film {
             id: data
                 .attr("data-film-id")
@@ -156,13 +158,9 @@ impl LetterboxdClient {
                 .into(),
             url: format!(
                 "https://letterboxd.com/film/{}",
-                data.attr("data-item-slug")
-                    .ok_or(LetterboxdError::HtmlMissingAttr("data-item-slug".into()))?
+                slug
             ),
-            poster: poster
-                .attr("src")
-                .ok_or(LetterboxdError::HtmlMissingAttr("src".into()))?
-                .into(),
+            poster: format!("/poster/{}", slug),
             rating,
         })
     }

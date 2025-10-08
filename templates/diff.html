@@ -25,12 +25,25 @@
   <a class="button is-link" href="/{{ user2 }}/vs/{{ user1 }}">Invert Comparison</a>
   <a class="button is-link" href="/{{ user2 }}/and/{{ user1 }}">And comparison</a>
   </p>
-  <ul>
-    {% for movie in diff %}
-    <li>
-      <span class="is-size-5"><a href={{ movie.url }}>{{ movie.name }}</a></span>
-      {% if movie.rating.is_some() %} {{ movie.rating.unwrap() }} {% endif %}
-    </li>
-    {% endfor %}
-  </ul>
+   <div class="columns is-multiline">
+     {% for movie in diff %}
+     <div class="column is-one-quarter-desktop is-half-tablet is-full-mobile">
+       <div class="card is-flex is-flex-direction-column">
+         <div class="card-image">
+           <figure class="image is-2by3">
+             <img src="{{ movie.poster }}" alt="{{ movie.name }}">
+           </figure>
+         </div>
+         <div class="card-content is-flex-grow-1" style="min-height: 120px;">
+           <div class="content">
+             <p class="title is-6"><a href="{{ movie.url }}">{{ movie.name }}</a></p>
+             {% if movie.rating.is_some() %}
+             <p class="subtitle is-7">{{ movie.rating.unwrap() }}</p>
+             {% endif %}
+           </div>
+         </div>
+       </div>
+     </div>
+     {% endfor %}
+   </div>
 {% endblock %}
