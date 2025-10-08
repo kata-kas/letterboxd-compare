@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user1 }} vs {{ user2 }}{% endblock %}
+
+{% block head %}
+  <style>
+  </style>
+  <script>
+    function redirect() {
+          let user1 = document.getElementById('user1').value;
+          let user2 = document.getElementById('user2').value;
+          window.location = "/" + user1 + "/vs/" + user2;
+        }
+  </script>
+{% endblock %}
+
+{% block content %}
+  <a class="button is-medium is-ghost" href="/">
+    Letterboxd Compare
+  </a>
+  <h1 class="title is-4">
+    Movies that both <span class="title is-1">{{ user1 }}</span> and <span class="title is-1">{{ user2 }}</span> has watched sorted by former's rating.
+  </h1>
+  <p class="subtitle">
+  <a class="button is-link" href="/{{ user2 }}/and/{{ user1 }}">Invert Comparison</a>
+  <a class="button is-link" href="/{{ user2 }}/vs/{{ user1 }}">Versus comparison</a>
+  </p>
+  <ul>
+    {% for (movie, other_rating) in diff %}
+    <li>
+      <span class="is-size-5"><a href={{ movie.url }}>{{ movie.name }}</a></span>
+      <span class="is-size-6">
+        {% if movie.rating.is_some() %} {{ movie.rating.unwrap() }} {% endif %} |
+        {% if other_rating.is_some() %} {{ other_rating.unwrap() }} {% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+{% endblock %}
