@@ -16,7 +16,7 @@ RUN cargo build --release --bin letterboxd-compare
 
 # We do not need the Rust toolchain to run the binary!
 FROM debian:bookworm-slim AS runtime
-RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libssl3 ca-certificates && update-ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV SSL_CERT_DIR=/etc/ssl/certs
 WORKDIR /app
 COPY --from=builder /app/target/release/letterboxd-compare /usr/local/bin
