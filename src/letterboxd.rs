@@ -129,7 +129,7 @@ pub struct ClientConfig {
 impl Default for ClientConfig {
     fn default() -> Self {
         ClientConfig {
-            user_agent: "LetterboxdScraper/1.0".to_string(),
+            user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36".to_string(),
             timeout: Duration::from_secs(30),
             max_retries: MAX_RETRIES,
             concurrent_requests: CONCURRENT_REQUESTS,

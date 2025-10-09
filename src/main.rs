@@ -60,7 +60,7 @@ async fn handle_vs(
     match get_diff(&cache, &user1, &user2).await {
         Ok(s) => Ok(warp::reply::html(s)),
         Err(err) => {
-            debug!("{:?}", &err);
+            info!("Error in handle_vs: {:?}", &err);
             match (IndexTemplate {
                 error_mess: Some(&err.to_string()),
             })
@@ -86,7 +86,7 @@ async fn handle_and(
     match get_and(&cache, &user1, &user2).await {
         Ok(s) => Ok(warp::reply::html(s)),
         Err(err) => {
-            debug!("{:?}", &err);
+            info!("Error in handle_and: {:?}", &err);
             match (IndexTemplate {
                 error_mess: Some(&err.to_string()),
             })
