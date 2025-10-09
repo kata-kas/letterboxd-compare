@@ -23,3 +23,5 @@ thiserror = "2.0.17"
 redis = { version = "0.32.7", features = ["tokio-comp"] }
 deadpool-redis = "0.22.0"
 governor = "0.10.1"
+sentry = { version = "0.45.0", features = ["panic"]}
+sentry-panic = "0.45.0"
