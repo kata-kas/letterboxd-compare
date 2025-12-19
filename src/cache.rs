@@ -14,8 +14,7 @@
      const KEY_PREFIX: &'static str = "letterboxd_cache:";
 
      pub async fn new() -> Result<Self> {
-         let url = env::var("UPSTASH_REDIS_URL")
-             .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+         let url = env::var("UPSTASH_REDIS_REST_URL").expect("UPSTASH_REDIS_REST_URL must be set");
          let ttl = env::var("CACHE_TTL_SECONDS")
              .ok()
              .and_then(|s| s.parse().ok())

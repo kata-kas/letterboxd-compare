@@ -12,7 +12,7 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::try_join;
-use tracing::{debug, info};
+use tracing::{info};
 use warp::Filter;
 use warp::http::Response;
 use sentry_panic;
@@ -240,6 +240,9 @@ async fn get_and(cache: &RedisCache, user1: &str, user2: &str) -> Result<String>
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenvy::dotenv().ok();
+    tracing_subscriber::fmt::init();
+
     let _guard = match std::env::var("SENTRY_DSN") {
         Ok(dsn) => {
             let guard = sentry::init((
@@ -260,8 +263,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             None
         }
     };
-
-    tracing_subscriber::fmt::init();
     let cache = Arc::new(RedisCache::new().await?);
     let port = std::env::var("PORT")
         .ok()
