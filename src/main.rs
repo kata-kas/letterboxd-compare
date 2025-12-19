@@ -36,6 +36,7 @@ struct DiffTemplate<'a> {
     user1: &'a str,
     user2: &'a str,
     cards: Vec<CardTemplate<'a>>,
+    genre: Option<&'a str>,
 }
 
 #[derive(Template)]
@@ -44,6 +45,7 @@ struct AndTemplate<'a> {
     user1: &'a str,
     user2: &'a str,
     cards: Vec<CardTemplate<'a>>,
+    genre: Option<&'a str>,
 }
 
 lazy_static! {
@@ -54,10 +56,11 @@ async fn handle_vs(
     cache: Arc<RedisCache>,
     user1: String,
     user2: String,
+    genre: Option<String>,
 ) -> Result<warp::reply::Html<String>, warp::reject::Rejection> {
     let user1 = user1.trim().to_string();
     let user2 = user2.trim().to_string();
-    match get_diff(&cache, &user1, &user2).await {
+    match get_diff(&cache, &user1, &user2, genre.as_deref()).await {
         Ok(s) => Ok(warp::reply::html(s)),
         Err(err) => {
             info!("Error in handle_vs: {:?}", &err);
@@ -80,10 +83,11 @@ async fn handle_and(
     cache: Arc<RedisCache>,
     user1: String,
     user2: String,
+    genre: Option<String>,
 ) -> Result<warp::reply::Html<String>, warp::reject::Rejection> {
     let user1 = user1.trim().to_string();
     let user2 = user2.trim().to_string();
-    match get_and(&cache, &user1, &user2).await {
+    match get_and(&cache, &user1, &user2, genre.as_deref()).await {
         Ok(s) => Ok(warp::reply::html(s)),
         Err(err) => {
             info!("Error in handle_and: {:?}", &err);
@@ -152,24 +156,30 @@ async fn handle_poster(
     Ok(response)
 }
 
-async fn cached_get_movies(cache: &RedisCache, username: &str) -> Result<Vec<Film>> {
-    if let Some(s) = cache.get(username).await? {
-        info!("cache hit for {}", username);
+async fn cached_get_movies(cache: &RedisCache, username: &str, genre: Option<&str>) -> Result<Vec<Film>> {
+    let cache_key = if let Some(g) = genre {
+        format!("{}:genre:{}", username, g)
+    } else {
+        username.to_string()
+    };
+
+    if let Some(s) = cache.get(&cache_key).await? {
+        info!("cache hit for {}", cache_key);
         let ret: Vec<Film> = serde_json::from_str(&s)?;
         return Ok(ret);
     }
-    let movies = CLIENT.get_movies_of_user(username).await?;
+    let movies = CLIENT.get_movies_of_user_with_genre(username, genre).await?;
     cache
-        .insert(username, &serde_json::to_string(&movies)?)
+        .insert(&cache_key, &serde_json::to_string(&movies)?)
         .await?;
     Ok(movies)
 }
 
-async fn get_diff(cache: &RedisCache, user1: &str, user2: &str) -> Result<String> {
-    info!("get_diff({}, {})", user1, user2);
+async fn get_diff(cache: &RedisCache, user1: &str, user2: &str, genre: Option<&str>) -> Result<String> {
+    info!("get_diff({}, {}, genre: {:?})", user1, user2, genre);
     let (movies1, movies2) = try_join!(
-        cached_get_movies(cache, user1),
-        cached_get_movies(cache, user2)
+        cached_get_movies(cache, user1, genre),
+        cached_get_movies(cache, user2, genre)
     )?;
 
     let watched_by_2: HashSet<_> = movies2.into_iter().map(|x| x.id).collect();
@@ -191,17 +201,18 @@ async fn get_diff(cache: &RedisCache, user1: &str, user2: &str) -> Result<String
         user1,
         user2,
         cards,
+        genre,
     }
         .render()
         .map_err(|e| anyhow::anyhow!("Diff template error: {}", e))?;
     Ok(html)
 }
 
-async fn get_and(cache: &RedisCache, user1: &str, user2: &str) -> Result<String> {
-    info!("get_and({}, {})", user1, user2);
+async fn get_and(cache: &RedisCache, user1: &str, user2: &str, genre: Option<&str>) -> Result<String> {
+    info!("get_and({}, {}, genre: {:?})", user1, user2, genre);
     let (movies1, movies2) = try_join!(
-        cached_get_movies(cache, user1),
-        cached_get_movies(cache, user2)
+        cached_get_movies(cache, user1, genre),
+        cached_get_movies(cache, user2, genre)
     )?;
 
     let watched_by_2: HashSet<_> = movies2.into_iter().collect();
@@ -232,6 +243,7 @@ async fn get_and(cache: &RedisCache, user1: &str, user2: &str) -> Result<String>
         user1,
         user2,
         cards,
+        genre,
     }
         .render()
         .map_err(|e| anyhow::anyhow!("And template error: {}", e))?;
@@ -272,12 +284,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let versus = {
         let cache_clone = cache.clone();
         warp::path!(String / "vs" / String)
-            .and_then(move |user1, user2| handle_vs(cache_clone.clone(), user1, user2))
+            .and(warp::query::<std::collections::HashMap<String, String>>())
+            .and_then(move |user1, user2, params: std::collections::HashMap<String, String>| {
+                let genre = params.get("genre").cloned();
+                handle_vs(cache_clone.clone(), user1, user2, genre)
+            })
     };
     let same = {
         let cache_clone = cache.clone();
         warp::path!(String / "and" / String)
-            .and_then(move |user1, user2| handle_and(cache_clone.clone(), user1, user2))
+            .and(warp::query::<std::collections::HashMap<String, String>>())
+            .and_then(move |user1, user2, params: std::collections::HashMap<String, String>| {
+                let genre = params.get("genre").cloned();
+                handle_and(cache_clone.clone(), user1, user2, genre)
+            })
     };
     let health = {
         let cache_clone = cache.clone();

@@ -270,9 +270,14 @@ impl LetterboxdClient {
         &self,
         username: &str,
         page: usize,
+        genre: Option<&str>,
     ) -> Result<reqwest::Response> {
         LetterboxdClient::validate_username(username)?;
-        let url = format!("{}/{}/films/page/{}", BASE_URL, username, page);
+        let url = if let Some(g) = genre {
+            format!("{}/{}/films/genre/{}/page/{}", BASE_URL, username, g, page)
+        } else {
+            format!("{}/{}/films/page/{}", BASE_URL, username, page)
+        };
         debug!("Fetching URL: {}", url);
 
         self.rate_limiter
@@ -315,10 +320,10 @@ impl LetterboxdClient {
 
     /// Gets movies from a specific page
     #[tracing::instrument(skip(self))]
-    pub async fn get_movies_from_page(&self, username: &str, page: usize) -> Result<Vec<Film>> {
+    pub async fn get_movies_from_page(&self, username: &str, page: usize, genre: Option<&str>) -> Result<Vec<Film>> {
         LetterboxdClient::validate_username(username)?;
         let text = self
-            .get_letterboxd_film_by_page(username, page)
+            .get_letterboxd_film_by_page(username, page, genre)
             .await?
             .text()
             .await
@@ -333,14 +338,14 @@ impl LetterboxdClient {
         Ok(films)
     }
 
-    /// Gets all movies for a user across all pages
+    /// Gets all movies for a user across all pages with optional genre filter
     #[tracing::instrument(skip(self))]
-    pub async fn get_movies_of_user(&self, username: &str) -> Result<Vec<Film>> {
+    pub async fn get_movies_of_user_with_genre(&self, username: &str, genre: Option<&str>) -> Result<Vec<Film>> {
         LetterboxdClient::validate_username(username)?;
 
         let no_of_pages = {
             let resp = self
-                .get_letterboxd_film_by_page(username, 1)
+                .get_letterboxd_film_by_page(username, 1, genre)
                 .await
                 .context("Failed to fetch first page")?;
             let text = resp.text().await.context("Failed to get response text")?;
@@ -351,11 +356,12 @@ impl LetterboxdClient {
 
         info!(
             no_of_pages = no_of_pages,
+            genre = genre,
             "Found pages for user {}", username
         );
 
         let films = stream::iter(1..=no_of_pages)
-            .map(|i| self.get_movies_from_page(username, i))
+            .map(|i| self.get_movies_from_page(username, i, genre))
             .buffer_unordered(self.config.concurrent_requests)
             .try_collect::<Vec<_>>()
             .await
@@ -366,6 +372,7 @@ impl LetterboxdClient {
 
         info!(
             films_len = films.len(),
+            genre = genre,
             "Collected films for user {}", username
         );
         Ok(films)

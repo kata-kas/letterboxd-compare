@@ -4,8 +4,52 @@
 
 {% block head %}
 <style>
+    .header-text {
+        font-size: 1.5rem;
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+    .username-highlight {
+        font-weight: bold;
+    }
+    .radio-group {
+        display: flex;
+        gap: 2rem;
+        justify-content: center;
+        margin-bottom: 2rem;
+    }
+    .input-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .compare-button-full {
+        width: 100%;
+        height: 3.5rem;
+        font-size: 1.25rem;
+        font-weight: bold;
+    }
+    @media screen and (max-width: 768px) {
+        .input-row {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 <script>
+    function updateHeaderText() {
+        let user1 = document.getElementById('user1').value.trim() || 'User A';
+        let user2 = document.getElementById('user2').value.trim() || 'User B';
+        let mode = document.querySelector('input[name="mode"]:checked').value;
+        let headerElem = document.getElementById('header-text');
+
+        if (mode === 'vs') {
+            headerElem.innerHTML = `Find movies that <span class="username-highlight">${user1}</span> has seen and rated, but <span class="username-highlight">${user2}</span> has not.`;
+        } else {
+            headerElem.innerHTML = `Find movies that both <span class="username-highlight">${user1}</span> and <span class="username-highlight">${user2}</span> have seen.`;
+        }
+    }
+
     function redirect() {
         let user1_elem = document.getElementById('user1');
         let user2_elem = document.getElementById('user2');
@@ -14,6 +58,7 @@
         let compare_button = document.getElementById('compare-button');
         let user1_val = user1_elem.value.trim();
         let user2_val = user2_elem.value.trim();
+        let mode = document.querySelector('input[name="mode"]:checked').value;
         let error = false;
         let err_message = "Username is not valid. Enter the LB username, not the display name.";
 
@@ -32,7 +77,12 @@
         }
         // redirect to the compare location
         compare_button.classList.add("is-loading");
-        window.location = "/" + user1_elem.value.trim() + "/vs/" + user2_elem.value.trim();
+        let genre = document.getElementById('genre').value;
+        let url = "/" + user1_val + "/" + mode + "/" + user2_val;
+        if (genre) {
+            url += "?genre=" + encodeURIComponent(genre);
+        }
+        window.location = url;
     }
 
     function validate_username(username) {
@@ -59,41 +109,102 @@
             event.preventDefault();
             return false;
         }
+
+        document.getElementById('user1').addEventListener('input', updateHeaderText);
+        document.getElementById('user2').addEventListener('input', updateHeaderText);
+        document.querySelectorAll('input[name="mode"]').forEach(radio => {
+            radio.addEventListener('change', updateHeaderText);
+        });
+
+        updateHeaderText();
     }
 </script>
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 2em">
-    <h1 class="title is-2" style="margin-bottom: 0px">
-        Letterboxd Compare
-    </h1>
-    <a href="https://github.com/kata-kas/letterboxd-compare" target="_blank">kata-kas/letterboxd-compare</a>
-</div>
-<form id="input-form" onsubmit="redirect()">
-    <div class="field">
-        <label class="label">Movies that</label>
-        <div class="control">
-            <input id="user1" class="input is-1" placeholder="LB username">
+<form id="input-form" onsubmit="redirect()" style="margin-top: 2em">
+    <div class="header-text" id="header-text">
+        Find movies that <span class="username-highlight">User A</span> has seen and rated, but <span class="username-highlight">User B</span> has not.
+    </div>
+
+    <div class="radio-group">
+        <label class="radio">
+            <input type="radio" name="mode" value="vs" checked>
+            Compare (A vs B)
+        </label>
+        <label class="radio">
+            <input type="radio" name="mode" value="and">
+            Both Seen (A & B)
+        </label>
+    </div>
+
+    <div class="input-row">
+        <div class="field">
+            <label class="label">User A (has seen)</label>
+            <div class="control">
+                <input id="user1" class="input" placeholder="username">
+            </div>
             <p id="user1-error" class="help is-danger" style="display: none"></p>
         </div>
-    </div>
-    <div class="field">
-        <label class="label">has watched, but</label>
-        <div class="control">
-            <input id="user2" class="input is-1" placeholder="LB username">
+
+        <div class="field">
+            <label class="label">User B (has not seen)</label>
+            <div class="control">
+                <input id="user2" class="input" placeholder="username">
+            </div>
             <p id="user2-error" class="help is-danger" style="display: none"></p>
         </div>
+
+        <div class="field">
+            <label class="label">Genre</label>
+            <div class="control">
+                <div class="select is-fullwidth">
+                    <select id="genre">
+                        <option value="">Any genre</option>
+                        <option value="action">Action</option>
+                        <option value="adventure">Adventure</option>
+                        <option value="animation">Animation</option>
+                        <option value="comedy">Comedy</option>
+                        <option value="crime">Crime</option>
+                        <option value="documentary">Documentary</option>
+                        <option value="drama">Drama</option>
+                        <option value="family">Family</option>
+                        <option value="fantasy">Fantasy</option>
+                        <option value="history">History</option>
+                        <option value="horror">Horror</option>
+                        <option value="music">Music</option>
+                        <option value="mystery">Mystery</option>
+                        <option value="romance">Romance</option>
+                        <option value="science-fiction">Science Fiction</option>
+                        <option value="thriller">Thriller</option>
+                        <option value="tv-movie">TV Movie</option>
+                        <option value="war">War</option>
+                        <option value="western">Western</option>
+                    </select>
+                </div>
+            </div>
+        </div>
     </div>
-    <label class="label">hasn't!</label>
-    <p class="subtitle">
-        <button type="submit" id="compare-button" class="button is-link" onclick="redirect()">Compare</button>
-    </p>
+
+    <button type="submit" id="compare-button" class="button is-link compare-button-full" onclick="redirect()">
+        Compare
+    </button>
 </form>
+
+<div style="text-align: center; margin-top: 2rem; color: #9ab; font-size: 0.9rem;">
+    For suggestions or bug reports, write me at
+    <i class="fab fa-discord" style="color: #5865F2;"></i> <strong>kata_kas</strong>
+    or
+    <i class="fas fa-envelope" style="color: #9ab;"></i> <a href="mailto:catalin.casuneanu@jay-software.com" style="color: #9ab; font-weight: bold;">catalin.casuneanu@jay-software.com</a>
+</div>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+    <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="catalin_casuneanu" data-color="#5F7FFF" data-emoji=""  data-font="Cookie" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#ffffff" data-coffee-color="#FFDD00" ></script>
+</div>
 
 {# error #}
 {% if error_mess.is_some() %}
-<article class="message is-danger">
+<article class="message is-danger" style="margin-top: 2rem">
     <div class="message-header">
         <p>Error</p>
     </div>

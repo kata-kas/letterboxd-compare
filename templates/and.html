@@ -3,18 +3,15 @@
 {% block title %}{{ user1 }} vs {{ user2 }}{% endblock %}
 
 {% block content %}
-<a class="button is-medium is-ghost pl-0" href="/">
-    Letterboxd Compare
-</a>
-<div class="content">
+<div class="content" style="margin-top: 2em">
     <h1 class="title is-4">
-        Movies that both <span class="title is-1">{{ user1 }}</span> and <span class="title is-1">{{ user2 }}</span> has
+        {% if genre.is_some() %}<span style="text-transform: capitalize">{{ genre.unwrap() }}</span> movies{% else %}Movies{% endif %} that both <span class="title is-1">{{ user1 }}</span> and <span class="title is-1">{{ user2 }}</span> has
         watched sorted by former's rating.
     </h1>
 </div>
 <div class="block is-flex is-gap-2">
-    <a class="button is-link" href="/{{ user2 }}/vs/{{ user1 }}">Invert Comparison</a>
-    <a class="button is-link" href="/{{ user2 }}/and/{{ user1 }}">And comparison</a>
+    <a class="button is-link" href="/{{ user2 }}/vs/{{ user1 }}{% if genre.is_some() %}?genre={{ genre.unwrap() }}{% endif %}">Invert Comparison</a>
+    <a class="button is-link" href="/{{ user2 }}/and/{{ user1 }}{% if genre.is_some() %}?genre={{ genre.unwrap() }}{% endif %}">And comparison</a>
 </div>
 <div class="columns is-multiline">
     {% for card in cards %}
